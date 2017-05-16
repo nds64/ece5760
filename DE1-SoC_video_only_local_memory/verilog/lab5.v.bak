@@ -1,0 +1,168 @@
+`timescale 1ns/1ns
+
+module testbench();
+	
+	reg clk_50, reset;
+	reg 			  [31:0] 	index;
+  reg         [6:0]   n, e, s, w;
+  //wire signed [6:0]   testbench_out;
+	
+	//Initialize clocks and index
+	initial begin
+		clk_50 = 1'b0;
+    n      = 7'b1111000;
+    e      = 7'b0000000;
+    s      = 7'b0000000;
+    w      = 7'b0000000;
+		index  = 32'd0;
+	end
+	
+	//Toggle the clocks
+	 always begin
+	 	#10
+	 	clk_50  = !clk_50;
+	 end
+	
+	// always begin
+	// 	#10
+ //    n[1]  = !n[1];
+	// 	n[2]  = !n[2];
+	// end
+	
+ //  always begin
+	// 	#20
+ //    s[1]  = !s[1];
+	// 	s[2]  = !s[2];
+	// end
+  
+	// always begin
+	// 	#40
+	// 	e[2]  = !e[2];
+	// end
+	
+ //  always begin
+	// 	#80
+	// 	w[2]  = !w[2];
+	// end
+  
+	//Intialize and drive signals
+	initial begin
+		reset  = 1'b0;
+		#10 
+		reset  = 1'b1;
+		#30
+		reset  = 1'b0;
+	end
+	
+	//Increment index
+	always @ (posedge clk_50) begin
+		index  <= index + 32'd1;
+	end
+
+	//Instantiation of Device Under Test
+ lab5 DUT  (
+             .clk(clk_50), 
+             .reset(reset)
+           );
+/*   node_update DUT (
+                    .clk(clk_50),
+                    .reset(reset),
+                    .enable(1'b1),
+                    .n(n),
+                    .e(e),
+                    .s(s),
+                    .w(w),
+                    .node(testbench_out)
+                  ); */
+endmodule
+
+
+module lab5(clk, reset);
+  parameter                   SIZE = 50;
+  parameter                   SIZE2 = 2500;
+	input 						          clk, reset;
+  reg           [6:0]         p_in_array[0:SIZE2-1];
+  wire          [6:0]         p_out_array[0:SIZE2-1]; 
+	
+  integer x;
+  always @(posedge clk) begin
+    if (reset) begin
+      for (x = 0; x < SIZE2; x = x + 1) begin
+        p_in_array[x] <= 7'd0;
+      end
+    end
+    else begin
+      for (x = 0; x < SIZE2; x = x + 1) begin
+        p_in_array[x] <= p_out_array[x];
+      end
+    end
+  end 
+  
+  genvar i,j;
+  generate 
+    for (i = 0; i < SIZE; i = i + 1) begin: NODE_X
+      for (j = 0; j < SIZE; j = j + 1) begin: NODE_Y
+				if(i == 0 || j == 0 || i == (SIZE-1) || j == (SIZE -1)) begin
+					assign p_out_array[j*SIZE+i] = 7'b0000111;
+				end
+				else if( i == 1) begin
+					assign p_out_array[j*SIZE+i] = 7'b0010111;
+				end
+				else begin
+					node_update x_dir(clk, reset, 1'b1, p_in_array[(j-1)*SIZE+i],  p_in_array[j*SIZE+i+1],  p_in_array[(j+1)*SIZE+i],  p_in_array[(j*SIZE+i-1)],
+																							p_out_array[j*SIZE+i]  );
+				end
+      end
+    end
+  endgenerate 
+endmodule
+
+//////////////////////////////////////////////////
+//           node particle                      //
+//   Each node stores the direction it's moving //
+//////////////////////////////////////////////////
+
+//       6     5     4     3 2         0    
+//  +-----+-----+-----+-----+----------+
+//  |  W  |  S  |  E  |  N  |Color(1-4)|
+//  +-----+-----+-----+-----+----------+
+//                                               
+
+module node_update (clk, reset, enable, n, e,
+                    s, w, node);
+	output reg	[6:0]	node;
+  input 		        clk, reset, enable;
+	input wire  [6:0] n  , e  , s  , w;
+  wire        [6:0] node_temp;
+  reg         [2:0] density;
+	
+  always @(posedge clk) begin
+    if(reset) begin
+      node <= 7'd0;
+    end
+    else begin//if(enable) begin
+      node <= node_temp;
+    end
+  end
+
+  always @(*) begin
+		density = 3'd0;
+		if (n[5])
+			density = density + 1;
+		if (e[6])
+			density = density + 1;
+		if (s[3])
+			density = density + 1;
+		if (w[4])
+			density = density + 1;
+	end
+
+  assign node_temp[3] = s[3] ? 1'b1 : 1'b0;
+  assign node_temp[4] = w[4] ? 1'b1 : 1'b0;
+  assign node_temp[5] = n[5] ? 1'b1 : 1'b0;
+  assign node_temp[6] = e[6] ? 1'b1 : 1'b0;
+
+  assign node_temp[2:0] = density;
+
+endmodule
+//////////////////////////////////////////////////
